@@ -1,1 +1,1 @@
-This program rewrites a function name (declaration and calls).
+Commands for refactoring Go programs.
