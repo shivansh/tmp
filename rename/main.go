@@ -10,8 +10,8 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/format"
 	"go/parser"
-	"go/printer"
 	"go/token"
 	"log"
 	"os"
@@ -64,5 +64,5 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	printer.Fprint(dst, fset, file)
+	format.Node(dst, fset, file)
 }
