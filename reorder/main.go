@@ -134,7 +134,7 @@ func contains(s []string, val string) bool {
 	return false
 }
 
-func render(names map[string]ast.Node, graph map[string][]string) {
+func render(nodes map[string]ast.Node, graph map[string][]string) {
 	g := graphviz.New()
 	gr, err := g.Graph()
 	if err != nil {
@@ -147,7 +147,7 @@ func render(names map[string]ast.Node, graph map[string][]string) {
 		g.Close()
 	}()
 
-	for u := range names {
+	for u := range nodes {
 		parent, err := gr.CreateNode(u)
 		if err != nil {
 			log.Fatal(err)
@@ -166,14 +166,12 @@ func render(names map[string]ast.Node, graph map[string][]string) {
 	}
 }
 
+// TODO: optimize
 func isDAG(graph map[string][]string) bool {
-	visited := make(map[string]struct{})
-	for n := range graph {
-		if _, ok := visited[n]; ok {
-			continue
-		}
+	for root := range graph {
+		visited := make(map[string]struct{})
 		queue := []string{}
-		queue = append(queue, n)
+		queue = append(queue, root)
 		for len(queue) > 0 {
 			u := queue[0]
 			visited[u] = struct{}{}
@@ -182,7 +180,6 @@ func isDAG(graph map[string][]string) bool {
 				if _, ok := visited[v]; ok {
 					return false
 				}
-				visited[v] = struct{}{}
 				queue = append(queue, v)
 			}
 		}
