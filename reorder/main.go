@@ -3,7 +3,7 @@
 //
 // Usage:
 //
-//		reorder [-svg graph.svg] -path file.go
+//	reorder [-svg graph.svg] file.go
 package main
 
 import (
@@ -19,7 +19,7 @@ import (
 )
 
 var (
-	svg = flag.String("svg", "", "(optional) path of the rendered SVG file")
+	svg = flag.String("svg", "", "path of the rendered SVG file")
 )
 
 func usage() {
@@ -47,15 +47,17 @@ func main() {
 
 	nodes := make(map[string]dst.Node)
 	inedge := make(map[string]int)
+	order := []string{} // order in which function declarations originally appear
 	dst.Inspect(file, func(n dst.Node) bool {
 		switch x := n.(type) {
 		case *dst.FuncDecl:
 			if _, ok := nodes[x.Name.Name]; ok {
 				// TODO: handle functions with same name but different receiver types.
-				log.Fatal("Multiple functions found with same name but different receiver types, aborting.")
+				log.Fatalf("%s: multiple functions found with same name but different receiver types, aborting.", path)
 			}
 			nodes[x.Name.Name] = x
 			inedge[x.Name.Name] = 0
+			order = append(order, x.Name.Name)
 		}
 		return true
 	})
@@ -86,13 +88,13 @@ func main() {
 	}
 
 	if !isDAG(graph) {
-		log.Fatal("Graph contains a cycle, topological ordering is not possible.")
+		log.Fatalf("%s: graph contains a cycle, topological ordering is not possible.", path)
 	}
 
 	// Topologically sort.
 	queue := []string{}
-	for u, count := range inedge {
-		if count == 0 {
+	for _, u := range order {
+		if inedge[u] == 0 {
 			queue = append(queue, u)
 		}
 	}
