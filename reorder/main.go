@@ -9,15 +9,13 @@ package main
 import (
 	"flag"
 	"fmt"
-	"go/ast"
-	"go/format"
-	"go/parser"
-	"go/token"
 	"log"
 	"os"
 
+	"github.com/dave/dst"
+	"github.com/dave/dst/decorator"
+	"github.com/dave/dst/dstutil"
 	"github.com/goccy/go-graphviz"
-	"golang.org/x/tools/go/ast/astutil"
 )
 
 var (
@@ -26,7 +24,7 @@ var (
 )
 
 func usage() {
-	fmt.Fprint(os.Stderr, "usage: reorder [-svg graph.svg] -path file.go")
+	fmt.Fprint(os.Stderr, "usage: reorder [-svg graph.svg] -path file.go\n")
 	os.Exit(2)
 }
 
@@ -38,17 +36,20 @@ func main() {
 		usage()
 	}
 
-	fset := token.NewFileSet()
-	file, err := parser.ParseFile(fset, *path, nil, parser.ParseComments)
+	f, err := os.ReadFile(*path)
+	if err != nil {
+		log.Fatal(err)
+	}
+	file, err := decorator.Parse(f)
 	if err != nil {
 		log.Fatal(err)
 	}
 
-	nodes := make(map[string]ast.Node)
+	nodes := make(map[string]dst.Node)
 	inedge := make(map[string]int)
-	ast.Inspect(file, func(n ast.Node) bool {
+	dst.Inspect(file, func(n dst.Node) bool {
 		switch x := n.(type) {
-		case *ast.FuncDecl:
+		case *dst.FuncDecl:
 			nodes[x.Name.Name] = x
 			inedge[x.Name.Name] = 0
 		}
@@ -57,15 +58,15 @@ func main() {
 
 	var parent string
 	graph := make(map[string][]string)
-	astutil.Apply(
+	dstutil.Apply(
 		file,
-		func(c *astutil.Cursor) bool { // pre-order
+		func(c *dstutil.Cursor) bool { // pre-order
 			n := c.Node()
 			switch x := n.(type) {
-			case *ast.FuncDecl:
+			case *dst.FuncDecl:
 				parent = x.Name.Name
-			case *ast.CallExpr:
-				if y, ok := x.Fun.(*ast.Ident); ok {
+			case *dst.CallExpr:
+				if y, ok := x.Fun.(*dst.Ident); ok {
 					if _, ok := nodes[y.Name]; ok && parent != y.Name && !contains(graph[parent], y.Name) {
 						graph[parent] = append(graph[parent], y.Name)
 						inedge[y.Name]++
@@ -104,25 +105,22 @@ func main() {
 	}
 
 	index = 0
-	astutil.Apply(file, nil, func(c *astutil.Cursor) bool {
+	dstutil.Apply(file, nil, func(c *dstutil.Cursor) bool {
 		n := c.Node()
 		switch n.(type) {
-		case *ast.FuncDecl:
+		case *dst.FuncDecl:
 			node := nodes[queue[index]]
-			c.Replace(node)
-			// TODO: reorder the associated CommentGroup.
-			// c.InsertBefore() doesn't work as current node is the child of *ast.FILE
-			// and the node being inserted should be of type *ast.Decl.
+			c.Replace(node) // https://github.com/golang/go/issues/20744
 			index++
 		}
 		return true
 	})
 
-	dst, err := os.OpenFile(*path, os.O_WRONLY, 0600)
+	dest, err := os.OpenFile(*path, os.O_WRONLY, 0600)
 	if err != nil {
 		log.Fatal(err)
 	}
-	format.Node(dst, fset, file)
+	decorator.Fprint(dest, file)
 }
 
 func contains(s []string, val string) bool {
@@ -134,7 +132,7 @@ func contains(s []string, val string) bool {
 	return false
 }
 
-func render(nodes map[string]ast.Node, graph map[string][]string) {
+func render(nodes map[string]dst.Node, graph map[string][]string) {
 	g := graphviz.New()
 	gr, err := g.Graph()
 	if err != nil {
