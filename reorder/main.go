@@ -50,6 +50,10 @@ func main() {
 	dst.Inspect(file, func(n dst.Node) bool {
 		switch x := n.(type) {
 		case *dst.FuncDecl:
+			if _, ok := nodes[x.Name.Name]; ok {
+				// TODO: handle functions with same name but different receiver types.
+				log.Fatal("Multiple functions found with same name but different receiver types, aborting.")
+			}
 			nodes[x.Name.Name] = x
 			inedge[x.Name.Name] = 0
 		}
