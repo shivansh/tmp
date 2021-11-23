@@ -19,24 +19,24 @@ import (
 )
 
 var (
-	svg  = flag.String("svg", "", "absolute path of the rendered SVG file")
-	path = flag.String("path", "", "absolute path of the file to be modified")
+	svg = flag.String("svg", "", "(optional) path of the rendered SVG file")
 )
 
 func usage() {
-	fmt.Fprint(os.Stderr, "usage: reorder [-svg graph.svg] -path file.go\n")
+	fmt.Fprint(os.Stderr, "usage: reorder [-svg graph.svg] file.go\n")
 	os.Exit(2)
 }
 
 func main() {
-	flag.Usage = usage
 	flag.Parse()
-
-	if *path == "" {
+	flag.Usage = usage
+	args := flag.Args()
+	if len(args) != 1 {
 		usage()
 	}
+	path := args[0]
 
-	f, err := os.ReadFile(*path)
+	f, err := os.ReadFile(path)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func main() {
 		return true
 	})
 
-	dest, err := os.OpenFile(*path, os.O_WRONLY, 0600)
+	dest, err := os.OpenFile(path, os.O_WRONLY, 0600)
 	if err != nil {
 		log.Fatal(err)
 	}
