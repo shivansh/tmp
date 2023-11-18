@@ -66,17 +66,17 @@ func main() {
 }
 
 type Trace struct {
-	RootId *string          `json:"root_id"`
-	Spans  map[string]*Span `json:"spans"`
+	RootId string          `json:"root_id"`
+	Spans  map[string]Span `json:"spans"`
 }
 
 type Span struct {
-	SpanId      *string  `json:"span_id"`
-	ParentId    *string  `json:"parent_id"`
-	Service     *string  `json:"service"`
-	Name        *string  `json:"name"`
-	Resource    *string  `json:"resource"`
-	Meta        *Meta    `json:"meta"`
+	SpanId      string   `json:"span_id"`
+	ParentId    string   `json:"parent_id"`
+	Service     string   `json:"service"`
+	Name        string   `json:"name"`
+	Resource    string   `json:"resource"`
+	Meta        Meta     `json:"meta"`
 	ChildrenIds []string `json:"children_ids"`
 }
 
@@ -84,15 +84,15 @@ type Meta struct {
 	GrpcRequest *string `json:"grpc.request"`
 }
 
-func (trace *Trace) getService(spanId *string) string {
-	return *trace.Spans[*spanId].Service
+func (trace *Trace) getService(spanId string) string {
+	return trace.Spans[spanId].Service
 }
 
-func (trace *Trace) getParent(spanId *string) string {
+func (trace *Trace) getParent(spanId string) string {
 	currId := spanId
 	currService := trace.getService(spanId)
 	for {
-		parentId := trace.Spans[*currId].ParentId
+		parentId := trace.Spans[currId].ParentId
 		parentService := trace.getService(parentId)
 		if parentService != currService {
 			return parentService
@@ -106,11 +106,8 @@ func (trace *Trace) printGrpcReqParams(grpcReq string) {
 		return
 	}
 	for _, span := range trace.Spans {
-		if span.Resource == nil {
-			continue
-		}
 		if strings.Contains(
-			strings.ToLower(*span.Resource),
+			strings.ToLower(span.Resource),
 			strings.ToLower(grpcReq),
 		) {
 			if params := span.Meta.GrpcRequest; params != nil {
@@ -155,6 +152,9 @@ func prepareTrace(data []byte) (*Trace, error) {
 	}{}
 	if err := json.Unmarshal(data, &resp); err != nil {
 		return nil, err
+	}
+	if resp.Trace == nil {
+		return nil, fmt.Errorf("no trace found")
 	}
 	return resp.Trace, nil
 }
