@@ -1,1 +1,1 @@
-Commands for refactoring Go programs.
+Utilities.
