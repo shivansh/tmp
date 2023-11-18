@@ -1,3 +1,16 @@
+// ddanalyze prints the grpc request parameters of a Datadog trace.
+//
+// Usage:
+//
+//	usage: ddanalyze [-tr trace_id] [-req grpc_request]
+//
+// The Datadog application key and API key should be present in DD_APP_KEY and
+// DD_API_KEY environment variables.
+//
+// The traces downloaded from Datadog are cached in /tmp.
+//
+// The parameters are intentionally printed one per line to allow easy interaction with
+// sort(1), uniq(1) and other utilities.
 package main
 
 import (
@@ -24,40 +37,51 @@ var (
 func main() {
 	flag.Usage = usage
 	flag.Parse()
-	args := flag.Args()
-	if len(args) != 0 {
-		fmt.Println(args)
+	if *traceId == "" || *grpcReq == "" {
 		usage()
 	}
 
-	data, err := getBody(*traceId)
+	f := "/tmp/ddanalyze-" + *traceId
+	var data []byte
+	if _, err := os.Stat(f); err != nil {
+		data, err = getTrace(*traceId)
+		if err != nil {
+			log.Fatal(err)
+		}
+		if err = os.WriteFile(f, data, 0644); err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		data, err = os.ReadFile(f)
+		if err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	trace, err := prepareTrace(data)
 	if err != nil {
 		log.Fatal(err)
 	}
-	trace, err := prepare(data)
-	if err != nil {
-		log.Fatal(err)
-	}
-	trace.printGrpcRequests(*grpcReq)
+	trace.printGrpcReqParams(*grpcReq)
 }
 
 type Trace struct {
-	RootId *string          `json:"root_id,omitempty"`
-	Spans  map[string]*Span `json:"spans,omitempty"`
+	RootId *string          `json:"root_id"`
+	Spans  map[string]*Span `json:"spans"`
 }
 
 type Span struct {
-	SpanId      *string  `json:"span_id,omitempty"`
-	ParentId    *string  `json:"parent_id,omitempty"`
-	Service     *string  `json:"service,omitempty"`
-	Name        *string  `json:"name,omitempty"`
-	Resource    *string  `json:"resource,omitempty"`
-	Meta        *Meta    `json:"meta,omitempty"`
-	ChildrenIds []string `json:"children_ids,omitempty"`
+	SpanId      *string  `json:"span_id"`
+	ParentId    *string  `json:"parent_id"`
+	Service     *string  `json:"service"`
+	Name        *string  `json:"name"`
+	Resource    *string  `json:"resource"`
+	Meta        *Meta    `json:"meta"`
+	ChildrenIds []string `json:"children_ids"`
 }
 
 type Meta struct {
-	GrpcRequest *string `json:"grpc.request,omitempty"`
+	GrpcRequest *string `json:"grpc.request"`
 }
 
 func (trace *Trace) getService(spanId *string) string {
@@ -77,7 +101,7 @@ func (trace *Trace) getParent(spanId *string) string {
 	}
 }
 
-func (trace *Trace) printGrpcRequests(req string) {
+func (trace *Trace) printGrpcReqParams(grpcReq string) {
 	if trace == nil {
 		return
 	}
@@ -85,23 +109,34 @@ func (trace *Trace) printGrpcRequests(req string) {
 		if span.Resource == nil {
 			continue
 		}
-		if strings.Contains(*span.Resource, req) {
-			if grpcRequest := span.Meta.GrpcRequest; grpcRequest != nil {
+		if strings.Contains(
+			strings.ToLower(*span.Resource),
+			strings.ToLower(grpcReq),
+		) {
+			if params := span.Meta.GrpcRequest; params != nil {
 				parent := trace.getParent(span.SpanId)
-				fmt.Printf("req=%v, parent=%v\n", *grpcRequest, parent)
+				fmt.Printf("params=%v, parent=%v\n", *params, parent)
 			}
 		}
 	}
 }
 
-func getBody(traceId string) ([]byte, error) {
+func getTrace(traceId string) ([]byte, error) {
+	apiKey := os.Getenv("DD_API_KEY")
+	if apiKey == "" {
+		return nil, fmt.Errorf("DD_API_KEY environment variable not set")
+	}
+	appKey := os.Getenv("DD_APP_KEY")
+	if appKey == "" {
+		return nil, fmt.Errorf("DD_APP_KEY environment variable not set")
+	}
 	url := "https://app.datadoghq.com/api/v1/trace/" + traceId
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return nil, err
 	}
-	req.Header.Add("DD-API-KEY", os.Getenv("DD_API_KEY"))
-	req.Header.Add("DD-APPLICATION-KEY", os.Getenv("DD_APP_KEY"))
+	req.Header.Add("DD-API-KEY", apiKey)
+	req.Header.Add("DD-APPLICATION-KEY", appKey)
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -114,9 +149,9 @@ func getBody(traceId string) ([]byte, error) {
 	return body, nil
 }
 
-func prepare(data []byte) (*Trace, error) {
+func prepareTrace(data []byte) (*Trace, error) {
 	resp := struct {
-		Trace *Trace `json:"trace,omitempty"`
+		Trace *Trace `json:"trace"`
 	}{}
 	if err := json.Unmarshal(data, &resp); err != nil {
 		return nil, err
