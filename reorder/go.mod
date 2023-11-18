@@ -1,6 +1,6 @@
-module github.com/shivansh/rewrite/reorder
+module github.com/shivansh/tmp/reorder
 
-go 1.17
+go 1.21.3
 
 require (
 	github.com/dave/dst v0.26.2
