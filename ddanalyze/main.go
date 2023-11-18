@@ -1,15 +1,15 @@
-// ddanalyze prints the grpc request parameters of a Datadog trace.
+// ddanalyze prints the gRPC request parameters across spans in a Datadog trace.
 //
 // Usage:
 //
-//	usage: ddanalyze [-tr trace_id] [-req grpc_request]
+//	ddanalyze [-tr trace_id] [-req grpc_request]
 //
 // The Datadog application key and API key should be present in DD_APP_KEY and
 // DD_API_KEY environment variables.
 //
 // The traces downloaded from Datadog are cached in /tmp.
 //
-// The parameters are intentionally printed one per line to allow easy interaction with
+// The parameters are printed as JSON one per line to allow easy interaction with jq(1),
 // sort(1), uniq(1) and other utilities.
 package main
 
@@ -31,7 +31,7 @@ func usage() {
 
 var (
 	traceId = flag.String("tr", "", "trace ID")
-	grpcReq = flag.String("req", "", "grpc request")
+	grpcReq = flag.String("req", "", "gRPC request")
 )
 
 func main() {
@@ -115,7 +115,7 @@ func (trace *Trace) printGrpcReqParams(grpcReq string) {
 		) {
 			if params := span.Meta.GrpcRequest; params != nil {
 				parent := trace.getParent(span.SpanId)
-				fmt.Printf("params=%v, parent=%v\n", *params, parent)
+				fmt.Printf("{\"params\":%v,\"parent\":\"%v\"}\n", *params, parent)
 			}
 		}
 	}
