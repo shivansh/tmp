@@ -7,7 +7,7 @@
 // The Datadog application key and API key should be present in DD_APP_KEY and
 // DD_API_KEY environment variables.
 //
-// The traces downloaded from Datadog are cached in /tmp.
+// The traces downloaded from Datadog are cached as /tmp/ddanalyze-{trace_id}.
 //
 // The parameters are printed as JSON one per line to allow easy interaction with jq(1),
 // sort(1), uniq(1) and other utilities.
@@ -19,9 +19,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 )
 
 func usage() {
@@ -73,6 +75,7 @@ type Trace struct {
 type Span struct {
 	SpanId      string   `json:"span_id"`
 	ParentId    string   `json:"parent_id"`
+	Start       float64  `json:"start"`
 	Service     string   `json:"service"`
 	Name        string   `json:"name"`
 	Resource    string   `json:"resource"`
@@ -112,7 +115,17 @@ func (trace *Trace) printGrpcReqParams(grpcReq string) {
 		) {
 			if params := span.Meta.GrpcRequest; params != nil {
 				parent := trace.getParent(span.SpanId)
-				fmt.Printf("{\"params\":%v,\"parent\":\"%v\"}\n", *params, parent)
+				sec, _ := math.Modf(span.Start)
+				t := time.Unix(int64(sec), 0)
+				resp := map[string]any{
+					"params": *params,
+					"parent": parent,
+					"start":  t.String(),
+				}
+				enc := json.NewEncoder(os.Stdout)
+				if err := enc.Encode(resp); err != nil {
+					log.Fatal(err)
+				}
 			}
 		}
 	}
