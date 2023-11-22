@@ -76,6 +76,7 @@ type Span struct {
 	SpanId      string   `json:"span_id"`
 	ParentId    string   `json:"parent_id"`
 	Start       float64  `json:"start"`
+	Duration    float64  `json:"duration"`
 	Service     string   `json:"service"`
 	Name        string   `json:"name"`
 	Resource    string   `json:"resource"`
@@ -118,9 +119,10 @@ func (trace *Trace) printGrpcReqParams(grpcReq string) {
 				sec, _ := math.Modf(span.Start)
 				t := time.Unix(int64(sec), 0)
 				resp := map[string]any{
-					"params": *params,
-					"parent": parent,
-					"start":  t.String(),
+					"params":   *params,
+					"parent":   parent,
+					"start":    t.String(),
+					"duration": span.Duration,
 				}
 				enc := json.NewEncoder(os.Stdout)
 				if err := enc.Encode(resp); err != nil {
