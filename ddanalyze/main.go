@@ -4,6 +4,7 @@
 //
 //	ddanalyze [-tr trace_id] [-req grpc_request]
 //
+// grpc_request is the case-insensitive substring of a RPC name.
 // The Datadog application key and API key should be present in DD_APP_KEY and
 // DD_API_KEY environment variables.
 //
